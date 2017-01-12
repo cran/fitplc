@@ -3,50 +3,68 @@
 #' @param xlab,ylab Optionally, X and Y axis labels (if not provided, a default is used).
 #' @param ylim Optionally, Y-axis limits.
 #' @param pch Optionally, the plotting symbol (default = 19, filled circles)
-#' @param selines Option for the confidence interval around Px, either 'parametric' (confidence interval computed with \code{\link{confint}}), 'bootstrap' (computed with non-parametric bootstrap) or 'none' (no plotting of the confidence interval).
+#' @param px_ci Option for the confidence interval around Px, either 'parametric' (confidence interval computed with \code{\link{confint}}), 'bootstrap' (computed with non-parametric bootstrap) or 'none' (no plotting of the confidence interval) (formerly argument was called \code{selines})
+#' @param px_ci_type Either 'vertical' (default), or 'horizontal', to plot confidence limits for Px.
+#' @param px_ci_label Logical (default TRUE), whether to write a label next to the CI for Px.
 #' @param plotrandom Logical. If TRUE (default is FALSE), plots the predictions for the random effects (only if random effects were included in the model fit).
 #' @param multiplier Multiply the scaled data (for plotting).
 #' @param x A fitted curve returned by \code{fitplc}
 #' @param plotPx Logical (default TRUE), whether to plot a vertical line for the P50.
 #' @param plotci Logical (default TRUE), whether to plot the confidence interval (if computed with bootci=TRUE).
 #' @param plotdata Logical (default TRUE), whether to add the data to the plot.
+#' @param plotfit Logical (default TRUE), whether to add the fitted curve to the plot.
 #' @param add Logical (default FALSE), whether to add the plot to a current device. This is useful to overlay two plots or curves, for example.
 #' @param citype Either 'polygon' (default), or 'lines', specifying formatting of the confidence interval in the plot.
 #' @param linecol The color(s) of the fitted curve (or color of the random effects curves if plotrandom=TRUE).
+#' @param linetype Line type for fitted curve (see options for \code{lty} in \code{\link{par}}).
 #' @param pointcol The color(s) of the data points.
 #' @param linecol2 The color of the fixed effects curve (if plotrandom=TRUE; otherwise ignored).
 #' @param pxlinecol The color of the lines indicating Px and its confidence interval 
 #' @param pxcex Character size for the Px label above the Y-axis.
-#' @param what Either 'relk' or 'embol'; it will plot either relative conductivity or percent embolism.
+#' @param what Either 'relk' or 'PLC' (or synonym 'embol'); it will plot either relative conductivity or percent loss conductivity (percent embolism).
+#' @param selines Obsolete; use \code{px_ci}
 #' @param \dots Further parameters passed to \code{plot}, or \code{points} (when \code{add=TRUE})
 #' @export
 #' @rdname plot.plcfit
 #' @importFrom graphics abline mtext plot
 #' @importFrom stats approx coef confint
 plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19, 
-                        plotPx=TRUE, plotci=TRUE, plotdata=TRUE, add=FALSE,
+                        plotPx=TRUE, plotci=TRUE, plotdata=TRUE, plotfit=TRUE, add=FALSE,
                         multiplier=NULL,
-                        selines=c("parametric","bootstrap","none"),
-                        plotrandom=FALSE,linecol="black",
+                        px_ci=c("bootstrap","parametric","none"),
+                        px_ci_type=c("vertical","horizontal"),
+                        px_ci_label=TRUE,
+                        plotrandom=FALSE,
+                        linecol="black",
+                        linetype=1,
                         linecol2="blue",
                         pxlinecol="red",
                         pxcex=0.7,
                         citype=c("polygon","lines"),
-                        what=c("relk","embol"), ...){
-  
+                        what=c("relk","PLC","embol"), 
+                        selines=NULL,
+                        ...){
   
   
   if(is.null(multiplier)){
     multiplier <- x$Kmax
   }
   
-  selines <- match.arg(selines)
+  if(!is.null(selines)){
+    warning("Argument 'selines' is now called 'px_ci'.")
+    px_ci <- match.arg(selines, eval(formals(plot.plcfit)$px_ci))
+  } else {
+    px_ci <- match.arg(px_ci)
+  }
+  
   citype <- match.arg(citype)
+  px_ci_type <- match.arg(px_ci_type)
   
   if(is.null(xlab))xlab <- expression(Water~potential~~(-MPa))
   
   type <- ifelse(plotdata, 'p', 'n')
   what <- match.arg(what)
+  if(what == "embol")what <- "PLC"
   
   # override
   if(x$condfit){
@@ -56,42 +74,47 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
   if(plotrandom && !x$fitran)
     stop("To plot random effects predictions, refit with 'random' argument.")
   
-  if(what == "relk"){
-    if(is.null(ylab)){
+  # Set y-axis label
+  if(is.null(ylab)){
+    if(what == "relk"){
+      
       if(!x$condfit){
         ylab <- "Relative conductivity (0 - 1)"
       } else {
         ylab <- "Conductivity / conductance (in units provided)"
       }
+    
+    } else if(what == "PLC"){
+      ylab <- "Percent loss conductivity (%)"
     }
-      
+  }
+  
+  # Set data
+  if(what == "relk"){
     x$data$Y <- x$data$relK
-    if(is.null(ylim))ylim <- c(0,multiplier*max(x$data$Y))
-  }
-  
-  toEmbol <- function(k)100 - 100*k
-  if(what == "embol"){
-    if(is.null(ylab))ylab <- "% Embolism"
-    
-    x$data$Y <- toEmbol(x$data$relK)
+  } else if(what == "PLC"){
+    x$data$Y <- x$data$PLC
+    x$pred$fit <- relk_to_plc(x$pred$fit)
     if(x$bootci){
-      x$pred$lwr <- toEmbol(x$pred$lwr)
-      x$pred$upr <- toEmbol(x$pred$upr)
+      x$pred$lwr <- relk_to_plc(x$pred$lwr)
+      x$pred$upr <- relk_to_plc(x$pred$upr)
     }
-    x$pred$pred <- toEmbol(x$pred$pred)
-    if(is.null(ylim))ylim <- c(0,100)
-    
-    if(x$fitran && plotrandom){
-      
-      ng <- length(x$prednlme)
-      for(i in 1:ng){
-        x$prednlme[[i]]$y <- toEmbol(x$prednlme[[i]]$y)
-      }
-      x$prednlmefix$y <- toEmbol(x$prednlmefix$y)
-    }
-    
   }
   
+  # Set y-axis limit
+  if(is.null(ylim))ylim <- c(0,multiplier*max(x$data$Y))
+
+  #if(is.null(ylim))ylim <- c(0,100)
+  
+  if(x$fitran && plotrandom){
+    
+    ng <- length(x$pred$ran)
+    if(what=="PLC"){
+      x$pred$ran <- lapply(x$pred$ran, function(f)relk_to_plc(f$fit))
+      x$pred$fit <- relk_to_plc(x$pred$fit)
+    }
+  }
+
   if(!add){
     with(x, {
       plot(data$P, multiplier * data$Y, ylim=ylim, pch=pch,
@@ -104,6 +127,7 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
       points(data$P, multiplier * data$Y, pch=pch, type=type,...)
     })
   }
+  
   if(!plotrandom){
     if(x$bootci && plotci){
       if(citype == "lines"){
@@ -123,41 +147,71 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
       }
       
     }
-    with(x$pred,{
-      lines(x, multiplier * pred, type='l', lty=1, col=linecol)
-    })
+    if(plotfit){
+      with(x$pred,{
+        lines(x, multiplier * fit, type='l', lty=linetype, col=linecol)
+      })
+    }
   }
   
   if(plotrandom){
-    for(i in 1:length(x$prednlme)){
-      with(x$prednlme[[i]], lines(x,multiplier * y,type='l',col=linecol))
+    for(i in 1:length(x$pred$ran)){
+      with(x$pred$ran[[i]], lines(x, multiplier * fit, type='l', col=linecol))
     }  
-    with(x$prednlmefix, lines(x,multiplier * y,type='l',lwd=2, col=linecol2))
+    with(x$pred, lines(x, multiplier * fit, type='l', lwd=2, col=linecol2))
   }
   
   if(plotPx){
-    if(!x$fitran){
-      px <- coef(x$fit)["PX"]
-      
-      if(selines == "bootstrap"){
-        px_ci <- x$bootpars[2,2:3]
-      } 
-      if(selines == "parametric") {
-        px_ci <- x$ci[2,]
-      }
-      
-    } else {
-      px <- fixef(x$nlmefit)["PX"]
-      px_ci <- x$cinlme[2,]
+    
+    px <- coef(x)["PX","Estimate"]
+    
+    if(px_ci_type != "horizontal"){
+      abline(v=px, col=pxlinecol)
+      mtext(side=3, at=px, text=bquote(P[.(x$x)]), 
+              line=0, col=pxlinecol, cex=pxcex)
     }
     
-    abline(v=px, col=pxlinecol)
-    if(selines != "none")abline(v=px_ci, col=pxlinecol, lty=5)
+    haveboot <- any(grepl("Boot", colnames(coef(x))))
+    havenorm <- any(grepl("Norm", colnames(coef(x))))
     
-    mtext(side=3, at=px, text=bquote(P[.(x$x)]), 
-          line=0, col=pxlinecol, cex=pxcex)
+    if(px_ci == "bootstrap" && !haveboot)px_ci <- "parametric"
+    
+    # Confidence lines for the P50
+    if(px_ci != "none"){
+      if(px_ci == "bootstrap" && !haveboot)px_ci <- "parametric"
+      if(px_ci == "parametric" && !havenorm)px_ci <- "bootstrap"
+      
+      nm <- switch(px_ci, bootstrap="Boot", parametric="Norm")
+      px_ci <- coef(x)["PX",ci_names(nm,coverage=x$coverage)]
+      
+      u <- par()$usr
+      dx <- (u[2] - u[1])/150
+      
+      if(px_ci_type == "vertical"){
+        abline(v=px_ci, col=pxlinecol, lty=5)
+
+        if(px_ci_label){
+          lab <- paste(label_coverage(x$coverage),nm)
+          text(px_ci[2]+dx, u[3] + 0.96*(u[4] - u[3]),
+               lab, cex=0.5*par()$cex, pos=4)
+        }
+        
+      }
+      if(px_ci_type == "horizontal") {
+        segments(x0=px_ci[1], x1=px_ci[2],
+                 y0=1-x$x/100, y1=1-x$x/100)
+        points(x=px, y=1-x$x/100, pch=21, bg="white")
+        
+        if(px_ci_label){
+          lab <- bquote(P[.(x$x)])
+          text(px_ci[2]+dx, 1-x$x/100,
+               lab, cex=0.6*par()$cex, pos=4)
+        }
+      }
+      
+    }
+    
   }
-  
 }
 
 
@@ -167,13 +221,14 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
 #'@param legendwhere As in \code{\link{legend}}, specification of where to place legend (e.g. 'bottomleft'; coordinates not accepted)
 #'@rdname plot.plcfit
 #'@importFrom grDevices rainbow
-plot.manyplcfit <- function(x, what=c("relk","embol"), 
+plot.manyplcfit <- function(x, what=c("relk","embol","PLC"), 
                             onepanel=FALSE, linecol=NULL, 
                             pointcol=NULL,
                             pch=19, 
                             legend=TRUE, legendwhere="topright", ...){
   
   what <- match.arg(what)
+  if(what == "embol")what <- "PLC"
   np <- length(x)
   
   if(length(pch) < np)pch <- rep(pch,np)

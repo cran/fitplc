@@ -1,45 +1,69 @@
 #' Fit a PLC curve
-#' @description This function fits the Weibull curve to measurements of stem or leaf conductivity 
-#' measurements at various water potentials. If measurements are organized as 'percent loss conductivity' (PLC), use the \code{fitplc} function. If they are organized as the actual conductance or conductivity (as is common for leaf hydraulic  conductance data, for example), use the \code{fitcond} function. See Details and Examples for more information on how to use these functions. 
+#' @description Fit a curve to measurements of stem or leaf conductivity at various water potentials. If measurements are organized as 'percent loss conductivity' (PLC), use the \code{fitplc} function. If they are organized as the actual conductance or conductivity (as is common for leaf hydraulic  conductance data, for example), use the \code{fitcond} function. You can choose to either fit the Weibull function (the default), or the sigmoidal-exponential model. See Details and Examples for more information on how to use these functions. 
 #' 
-#' It is also possible to fit multiple curves at once, for example one for each species or site, 
-#' with the \code{fitplcs} and \code{fitconds} functions.
+#' It is also possible to fit multiple curves at once, for example one for each species or site, with the \code{fitplcs} and \code{fitconds} functions. This is useful when you have data for multiple curves organized in one file.
 #' 
+#' Random effects may be incorporated via the \code{random} argument (see Examples), in which case \code{nlme} will be used (in case of the Weibull), or \code{lme} (in case of the sigmoidal model).
+#'
 #' See \code{\link{plot.plcfit}} for documentation on plotting methods for the fitted objects, and the examples below.
+#'
 #' @param dfr A dataframe that contains water potential and plc or conductivity/conductance data.
-#' @param varnames A vector specifying the names of the PLC and water potential data (WP).
-#' @param weights A variable used as weights in weighted non-linear regression that must be present in the dataframe (unquoted, see examples).
-#' @param random Variable that specified random effects (unquoted; must be present in dfr).
+#' @param varnames A vector specifying the names of the PLC and water potential data (see Examples).
+#' @param weights A variable used as weights that must be present in the dataframe (unquoted, see examples).
+#' @param random Variable that specifies random effects (unquoted; must be present in dfr).
 #' @param x If the P50 is to be returned, x = 50. Set this value if other points of the PLC curve should be estimated (although probably more robustly done via \code{\link{getPx}}).
-#' @param model At the moment, only 'Weibull' is allowed.
-#' @param startvalues A list of starting values. If set to NULL, \code{fitplc} will attempt to guess starting values.
+#' @param coverage The coverage of the confidence interval for the parameters (0.95 is the default).
+#' @param model Either 'Weibull' or 'sigmoidal'. See Details.
+#' @param startvalues Obsolete - starting values for Weibull now estimated from sigmoidal model fit.
 #' @param bootci If TRUE, also computes the bootstrap confidence interval.
-#' @param nboot The number of bootstrap replicates (only relevant when \code{bootci=TRUE}).
+#' @param nboot The number of bootstrap replicates used for calculating confidence intervals.
 #' @param quiet Logical (default FALSE), if TRUE, don't print any messages.
 #' @param Kmax Maximum conduct(ance)(ivity), optional (and only when using \code{fitcond}). See Examples.
 #' @param WP_Kmax Water potential above which Kmax will be calculated from the data. Optional (and only when using \code{fitcond}). See Examples.
-#' @details If a variable with the name Weights is present in the dataframe, 
-#' this variable will be used as the \code{weights} argument in \code{\link{nls}} to perform 
-#' weighted non-linear regression. See the final example on how to use this.
-#' 
-#' If the \code{random} argument specifies a factor variable present in the dataframe, random effects will 
-#' be estimated both for SX and PX. This affects \code{coef} as well as the confidence intervals for the fixed effects.
 #'
-#' A plot method is available for the fitted object, see examples on how to use it.
+#' @details 
+#' \strong{Models} - 
+#' The Weibull model is fit as reparameterized by Ogle et al. (2009), using non-linear regression (\code{\link{nls}}) or a non-linear mixed-effects model if a random effect is present (\code{\link{nlme}}). The sigmoidal-exponential model follows the 
+#' specification by Pammenter and van Willigen (1998) : PLC is log-transformed so a linear fit can be obtained with \code{\link{lm}} or \code{\link{lme}} in the presence of a random effect. 
+#' Parameters estimated are PX (water potential at which X% conductivity is lost) and SX 
+#' (slope of PLC vs. water potential at P50, MPa per percent). For the sigmoidal model, SX is a parameter combination (and so is PX when x is not 50), so only bootstrap estimates of the confidence intervals are given. 
+#'
+#' \strong{Bootstrap} - 
+#' We recommend, where possible, to use the bootstrapped confidence intervals for inference (use at least ca 1000 resamples). For the Weibull model, this is only possible when a sufficiently large sample size is available for a single curve (otherwise too many nls fits will fail). For the sigmoidal model, however, bootstrap is always possible and will always be employed (it cannot be turned off).
+#' 
+#' \strong{Confidence intervals} - 
+#' Calculation of confidence intervals (CI) depends on the method chosen. For the Weibull model, the CI based on profiling ('Normal approximation') is always performed, and a non-parametric bootstrap when \code{bootci=TRUE}. Both are output in \code{coef}, and the bootstrap CI is used in plotting unless otherwise specified (see \code{\link{plot.plcfit}}). When a random effect is specified (for the Weibull model), the CI is calculated with \code{\link{intervals.lme}}. For the sigmoidal model, PX and SX are functions of parameters of a linearized fit, and we thus always use the bootstrap when no random effect is present (it cannot be switched off). When a random effect is included in the sigmoidal model, we use \code{\link{deltaMethod}} from the \code{car} package.
+#' 
+#' \strong{Weights} - 
+#' If a variable with the name Weights is present in the dataframe, this variable will be used as the \code{weights} argument to perform weighted (non-linear) regression. See Examples on how to use this.
+#' 
+#' \strong{Random effects} - 
+#' If the \code{random} argument specifies a factor variable present in the dataframe, random effects will be estimated both for SX and PX. This affects \code{coef} as well as the confidence intervals for the fixed effects. For both the Weibull model and the sigmoidal model, only the random intercept terms are estimated (i.e. \code{random=~1|group}).
+#'
+#' A plot method is available for the fitted object, see Examples below.
 #' @export
 #' @importFrom nlme fixef
 #' @importFrom nlme nlme
 #' @importFrom nlme intervals
-
+#' @importFrom car deltaMethod
+#' @importFrom graphics par
+#' @importFrom graphics points
+#' @importFrom graphics segments
+#' @importFrom graphics text
+#' @importFrom stats lm
+#' @importFrom nlme lme
 #' @rdname fitplc
+#' 
 #' @examples
 #'
 #' # We use the built-in example dataset 'stemvul' in the examples below. See ?stemvul.
+#' # Most examples will fit the Weibull model (the default); try running some of the examples
+#' # with 'model="sigmoidal"' and compare the results.
 #'   
 #' # 1. Fit one species (or fit all, see next example)
 #' dfr1 <- subset(stemvul, Species =="dpap")
 #' 
-#' # Make fit. Store results in object 'pfit'
+#' # Fit Weibull model. Store results in object 'pfit'
 #' # 'varnames' specifies the names of the 'PLC' variable in the dataframe,
 #' # and water potential (WP). 
 #' # In this example, we use only 50 bootstrap replicates but recommend you set this
@@ -59,6 +83,13 @@
 #' # Get the coefficients of the fit.
 #' coef(pfit)
 #' 
+#' # Repeat for the sigmoidal model
+#' # Note that varnames specification above is the same as the default, so it 
+#' # can be omitted.
+#' pfit2 <- fitplc(dfr1, model="sigmoid")
+#' plot(pfit2)
+#' coef(pfit2)
+#' 
 #' # 2. Fit all species in the dataset.
 #' # Here we also set the starting values (which is sometimes needed).
 #' # In this example, we use only 50 bootstrap replicates but recommend you set this
@@ -66,7 +97,7 @@
 #' allfit <- fitplcs(stemvul, "Species", varnames=c(PLC="PLC", WP="MPa"), nboot=50)
 #' 
 #' # 3. Plot the fits.
-#' plot(allfit, onepanel=TRUE, plotci=FALSE, selines="none", pxlinecol="dimgrey")
+#' plot(allfit, onepanel=TRUE, plotci=FALSE, px_ci="none", pxlinecol="dimgrey")
 #'
 #' # Coefficients show the estimates and 95% CI (given by 'lower' and 'upper')
 #' # Based on the CI's, species differences can be decided.
@@ -97,7 +128,7 @@
 #' 
 #' # Fit multiple conductivity curves at once (bootstrap omitted for speed).
 #' kfits3 <- fitconds(stemvul, "Species", varnames=list(K="Cond", WP="MPa"), WP_Kmax=-0.3, boot=FALSE)
-#' plot(kfits3, onepanel=TRUE, ylim=c(0,12), selines="none")
+#' plot(kfits3, onepanel=TRUE, ylim=c(0,12), px_ci="none")
 #' 
 #' # 5. Random effects.
 #' # This example takes into account the fact that the individual data points for a species are not 
@@ -109,14 +140,31 @@
 fitplc <- function(dfr, varnames = c(PLC="PLC", WP="MPa"),
                    weights=NULL,
                    random=NULL,
-                   model="Weibull", 
-                   startvalues=list(Px=3, S=20), x=50,
+                   model=c("Weibull","sigmoidal"), 
+                   x=50,
+                   coverage=0.95,
                    bootci=TRUE,
                    nboot=999,
-                   quiet=FALSE,
+                   quiet=TRUE,
+                   startvalues=NULL,
                    ...){
-
-                   
+    
+    
+    if(!is.null(startvalues)){
+      if(!quiet)warning("startvalues ignored - starting values now estimated from sigmoidal fit.")
+    }
+  
+    # sigmoid_lm
+    # sigmoid_lme
+    # weibull_nls
+    # weibull_nlme
+  
+    model <- match.arg(model)
+    
+    if(!bootci && model == "sigmoidal"){
+      warning("Cannot switch off bootstrap with sigmoidal model - ignored.")
+      bootci <- TRUE
+    }
   
     # Find out if called from fitcond.
     mc <- names(as.list(match.call()))
@@ -136,9 +184,6 @@ fitplc <- function(dfr, varnames = c(PLC="PLC", WP="MPa"),
     if(!varnames["WP"] %in% names(dfr))
       stop("Check variable name for water potential!")
     
-    Y <- dfr[[varnames["PLC"]]]
-    P <- dfr[[varnames["WP"]]]
-    
     if(!is.null(substitute(random))){
       G <- eval(substitute(random), dfr)
       fitran <- TRUE
@@ -147,146 +192,298 @@ fitplc <- function(dfr, varnames = c(PLC="PLC", WP="MPa"),
         if(!quiet)message("Not performing bootstrap when random effects present.")
       }
     } else {
+      G <- NA
       fitran <- FALSE
     }
     
-    W <- eval(substitute(weights), dfr)
-    
-    # check for NA
-    if(any(is.na(c(Y,P))))stop("Remove missing values first.")
+
+    # Extract data
+    plc <- dfr[[varnames["PLC"]]]
+    P <- dfr[[varnames["WP"]]]
+    if(any(is.na(c(plc,P))))stop("Remove missing values first.")
+    relK <- plc_to_relk(plc)
     
     # Need absolute values of water potential
     if(mean(P) < 0)P <- -P
     
-    # Calculate relative conductivity:
-    relK <- (100 - Y)/100
+    # weights, if provided
+    W <- eval(substitute(weights), dfr)
     
-    if(!fitran){
-      Data <- data.frame(P=P, relK=relK)
-    } else {
-      Data <- data.frame(P=P, relK=relK, G=G)
-    }
+    # Dataset tidied
+    Data <- data.frame(P=P, PLC=plc, relK=relK, G=G)
+    Data$minP <- -Data$P  # negative valued water potential
     
-    # guess starting values
-    if(is.null(startvalues)){
-      pxstart <- (1-x/100)*(max(P) - min(P))
-      Sh <- 15
-    } else {
-      pxstart <- startvalues$Px
-      Sh <- startvalues$S
-    }
     
-    # fit
-    Data$X <- x
-    if(!quiet)message("Fitting nls ...", appendLF=FALSE)
+    
+    if(model == "sigmoidal"){
+      
+      if(!fitran){
+        # without random effect
+        f <- do_sigmoid_fit(Data, boot=TRUE, nboot=nboot)
+        
+        cf <- sigfit_coefs(f$boot[,1], f$boot[,2],x=x)
+        boot_Sx <- cf$Sx  
+        boot_Px <- cf$Px
+        
+        p <- coef(f$fit)
+        
+        mf <- sigfit_coefs(p[1],p[2],x=x)
+        ml_Sx <- mf$Sx
+        ml_Px <- mf$Px
+          
+        # Coefficients matrix
+        cipars <- rbind(c(ml_Sx, boot_ci(boot_Sx, coverage)),
+                        c(ml_Px, boot_ci(boot_Px, coverage)))
+        
+        dimnames(cipars) <- list(c("SX","PX"), 
+                                 c("Estimate", ci_names("Boot",coverage)))
+        
+        # f must be component with 'fit' and 'boot'
+        pred <- get_boot_pred_sigmoid(f, Data, coverage)
+        
+        fit <- f$fit
+        
+      
+        
+      } else {
+        # with random effect
+        
+        #--> to subfunction
+        # This is necessary - might have to revisit this method.
+        #Data$PLCf <- pmax(0.1, pmin(99.9, Data$PLC))
+        fit <- do_sigmoid_lme_fit(Data, W)
+        
+        Px_ci <- deltaMethod(fit, "b0/b1", parameterNames=c("b0","b1"))
+        
+        # deltaMethod not needed here but convenient and equivalent
+        Sx_ci <- deltaMethod(fit, "100*b1/4", parameterNames=c("b0","b1"))
+        cipars <- rbind(Sx_ci, Px_ci)
+        cipars$SE <- NULL
+        dimnames(cipars) <- list(c("SX","PX"),
+		                         c("Estimate",
+		                           sprintf("Norm - %s",label_lowci(coverage)),
+		                           sprintf("Norm - %s",label_upci(coverage))))
+        
+        #--> to here
+        
+        predran <- lapply(split(Data, Data$G), function(x){
+          
+          ps <- seq_within(x$minP, n=101)
+          newdat <- data.frame(minP=ps, G=unique(x$G))
+          
+          list(x=-ps, fit=sigmoid_untrans(unname(predict(fit, newdat)))) 
+        })
+        
+        ps <- seq_within(Data$minP, n=101)
+        newdat <- data.frame(minP=ps, X=x)
+        pred <- list(x=-ps, fit=predict(fit, newdat, level=0), ran=predran)
+        pred$fit <- sigmoid_untrans(pred$fit)
+        
+      }
+      
+      l <- list(fit=fit, pred=pred, cipars=cipars, data=Data, x=x, Kmax=1)
 
-    # Weighted NLS
-    if(!is.null(W)){
-        nlsfit <- nls(relK ~ fweibull(P,SX,PX,X),
-                    data=Data, start=list(SX=Sh, PX=pxstart),
-                    weights=W)
-        if(fitran){
-          nlmefit <- nlme(relK ~ fweibull(P, SX, PX, X),
-                     fixed=list(SX ~ 1, PX ~ 1),
-                     random= SX + PX ~ 1|G,
-                     start=list(fixed=c(SX=coef(nlsfit)["SX"], 
-                                        PX=coef(nlsfit)["PX"])),
-                     weights=W,
-                     data=Data)
+    }
+
+    
+    # move to subfunction
+    if(model == "Weibull"){
+    
+      # guess starting values from sigmoidal
+      f <- do_sigmoid_fit(Data, boot=FALSE)
+      p <- coef(f$fit)
+      sp <- sigfit_coefs(p[1],p[2],x=x)
+      
+      # fit
+      Data$X <- x  # Necessary for bootstrap - I think.
+      if(!quiet)message("Fitting nls ...", appendLF=FALSE)
+  
+      # Weighted NLS
+      if(!is.null(W)){
+          
+          if(!fitran){
+            fit <- nls(relK ~ fweibull(P,SX,PX,X),
+                      data=Data, start=list(SX=sp$Sx, PX=sp$Px),
+                      weights=W)
+          } else {
+            nlmefit <- nlme(relK ~ fweibull(P, SX, PX, X),
+                       fixed=list(SX ~ 1, PX ~ 1),
+                       random= SX + PX ~ 1|G,
+                       start=list(fixed=c(SX=sp$Sx, 
+                                          PX=sp$Px)),
+                       weights=W,
+                       data=Data)
+          }
+        
+      } else {
+        
+      # Ordinary NLS
+        if(!fitran){
+          fit <- nls(relK ~ fweibull(P,SX,PX,X),
+                      data=Data, start=list(SX=sp$Sx, PX=sp$Px))
+        } else {
+          fit <- nlme(relK ~ fweibull(P, SX, PX, X),
+                          fixed=list(SX ~ 1, PX ~ 1),
+                          random= SX + PX ~ 1|G,
+                          start=list(fixed=c(SX=sp$Sx, 
+                                             PX=sp$Px)),
+                          data=Data)
         }
-    } else {
-      
-    # Ordinary NLS
-      nlsfit <- nls(relK ~ fweibull(P,SX,PX,X),
-                    data=Data, start=list(SX=Sh, PX=pxstart))
-      if(fitran){
-        nlmefit <- nlme(relK ~ fweibull(P, SX, PX, X),
-                        fixed=list(SX ~ 1, PX ~ 1),
-                        random= SX + PX ~ 1|G,
-                        start=list(fixed=c(SX=coef(nlsfit)["SX"], 
-                                           PX=coef(nlsfit)["PX"])),
-                        data=Data)
       }
-    }
-    if(!quiet)message("done.")
-    
-    # bootstrap
-    if(bootci){
-      if(!quiet)message("Fitting to bootstrap replicates ...", appendLF=FALSE)
-      p <- predict_nls(nlsfit, xvarname="P", interval="confidence", data=Data, 
-                       startList=list(SX=Sh, PX=pxstart), weights=W, nboot=nboot)
       if(!quiet)message("done.")
-    } else {
-      p <- predict_nls(nlsfit, xvarname="P", interval="none", data=Data, 
-                       startList=list(SX=Sh, PX=pxstart), weights=W, nboot=nboot)
-    }
-    
-    # Predictions at innermost random effect
-    if(fitran){
       
-      d <- split(Data, Data$G)
-      pm <- list()
-      for(i in 1:length(d)){
-        ps <- seq(min(d[[i]]$P),max(d[[i]]$P),length=101)
-        newdat <- data.frame(P=ps, 
-                             G=unique(d[[i]]$G), X=x)
-        y <- predict(nlmefit, newdat)
-        pm[[i]] <- data.frame(x=ps, y=y) 
+      # bootstrap
+      if(!fitran){
+    
+        if(bootci){
+          if(!quiet)message("Fitting to bootstrap replicates ...", appendLF=FALSE)
+          
+          pred <- predict_nls(fit, xvarname="P", interval="confidence", data=Data, 
+                           startList=list(SX=sp$Sx, PX=sp$Px), weights=W, 
+                           level=coverage,
+                           nboot=nboot)
+          if(!quiet)message("done.")
+        } else {
+          pred <- predict_nls(fit, xvarname="P", interval="none", data=Data, 
+                           startList=list(SX=sp$Sx, PX=sp$Px), 
+                           level=coverage,
+                           weights=W, nboot=nboot)
+        }
+      } else {
+        
+        predran <- lapply(split(Data, Data$G), function(group){
+          
+          ps <- seq_within(group$P, n=101)
+          newdat <- data.frame(P=ps, G=unique(group$G), X=x)
+          
+          list(x=ps, fit=unname(predict(fit, newdat))) 
+        })
+        
+        ps <- seq_within(Data$P, n=101)
+        newdat <- data.frame(P=ps, X=x)
+        pred <- list(x=ps, fit=predict(fit, newdat, level=0), ran=predran)
+        
       }
-      ps <- seq(min(P),max(P),length=101)
-      newdat <- data.frame(P=ps, X=x)
-      pmf <- data.frame(x=ps, y=predict(nlmefit, newdat, level=0))
       
-    } else {
-      pm <- NA
-      pmf <- NA
-    }
-    
-    # ci on pars.
-    cipars <- try(suppressMessages(confint(nlsfit)), silent=TRUE)
-    if(inherits(cipars, "try-error")){
-      cipars <- matrix(rep(NA,4),ncol=2)
-      dimnames(cipars) <- list(c("SX","PX"), c("2.5%","97.5%")) 
-    }
-    
-    if(bootci){
-      cisx <- quantile(p$boot[,"SX"], c(0.025,0.975))
-      cipx <- quantile(p$boot[,"PX"], c(0.025,0.975))
-
-      bootpars <- matrix(c(coef(nlsfit),cisx[1],cipx[1],cisx[2],cipx[2]), nrow=2,
-                         dimnames=list(c("SX","PX"),c("Estimate","2.5%","97.5%")))
-    } else {
-      bootpars <- NA
-    }               
-    
-    l <- list()
-    l$fit <- nlsfit
-    l$pred <- p
-    l$prednlme <- pm
-    l$prednlmefix <- pmf
-    l$ci <- cipars
-    l$bootpars <- bootpars
-    l$data <- data.frame(P=P, Y=Y, relK=relK)
-    l$x <- x
-    l$fitran <- fitran
-    if(fitran){
-      l$nlmefit <- nlmefit
-      l$cinlme <- intervals(nlmefit,which="fixed")$fixed
-      l$ranvar <- substitute(random)
-    } else {
-      l$nlmefit <- NA
-      l$cinlme <- NA
-      l$ranvar <- NA
-    }
+      if(!fitran){
+        # ci on pars.
+        cipars <- try(suppressMessages(confint(fit, level=coverage)), silent=TRUE)
+        if(inherits(cipars, "try-error")){
+          cipars <- matrix(rep(NA,4),ncol=2)
+        }
+        cipars <- cbind(coef(fit), cipars)
+        dimnames(cipars) <- list(c("SX","PX"), c("Estimate", 
+                                                 sprintf("Norm - %s",label_lowci(coverage)),
+                                                 sprintf("Norm - %s",label_upci(coverage))))
       
-    l$bootci <- bootci
-    l$condfit <- condfit
-    l$Kmax <- Kmax
-    l$nboot <- nboot
+        if(bootci){
+          cisx <- quantile(pred$boot[,"SX"], c((1-coverage)/2, 1 - (1-coverage)/2))
+          cipx <- quantile(pred$boot[,"PX"], c((1-coverage)/2, 1 - (1-coverage)/2))
+    
+          bootpars <- matrix(c(cisx[1],cipx[1],cisx[2],cipx[2]), nrow=2,
+                             dimnames=list(c("SX","PX"),
+                                           c(sprintf("Boot - %s",label_lowci(coverage)),
+                                           sprintf("Boot - %s",label_upci(coverage)))))
+          cipars <- cbind(cipars, bootpars)
+        }               
+      } else {
+        cipars <- intervals(fit,which="fixed")$fixed[,c(2,1,3)]
+        colnames(cipars) <- c("Estimate",
+                              sprintf("Norm - %s",label_lowci(coverage)),
+                              sprintf("Norm - %s",label_upci(coverage)))
+        attributes(cipars)$label <- NULL
+      }
+      
+      l <- list()
+      l$fit <- fit
+      l$pred <- pred
+      l$cipars <- cipars
+      l$data <- data.frame(P=P, PLC=plc, relK=relK)
+      l$x <- x
+      l$fitran <- fitran
+        
+      l$bootci <- bootci
+      l$condfit <- condfit
+      l$Kmax <- Kmax
+      l$nboot <- nboot
+      
+    }
     
     class(l) <- "plcfit"
-    
-return(l)
+    l$condfit <- condfit
+    l$fitran <- fitran
+    l$bootci <- bootci
+    l$model <- model
+    l$coverage <- coverage
+    return(l)
 }    
 
+
+
+do_sigmoid_fit <- function(data, W=NULL, boot=FALSE, nboot){
+  
+  # This is necessary - might have to revisit this method.
+  #data$PLCf <- pmax(0.1, pmin(99.9, data$PLC))
+  
+  data <- data[data$PLC < 100 & data$PLC > 0,]
+
+  # Transformation as per P&vW
+  data$logPLC <- log(100/data$PLC - 1)
+  
+  if(!is.null(W)){
+    lmfit <- lm(logPLC ~ minP, data=data, weights=W)
+    br <- if(boot) suppressWarnings(bootfit(lmfit, n=nboot, Data=data, startList=NULL, weights=W)) else NA
+  } else {
+    lmfit <- lm(logPLC ~ minP, data=data)
+    br <- if(boot) suppressWarnings(bootfit(lmfit, n=nboot, Data=data, startList=NULL)) else NA
+  }
+  
+  return(list(fit=lmfit, boot=br))
+}
+
+do_sigmoid_lme_fit <- function(data, W=NULL){
+  
+  data <- data[data$PLC > 0 & data$PLC < 100,]
+  
+  data$logPLC <- log(100/data$PLC - 1)
+  
+  fit <- lme(logPLC ~ minP,
+             random= ~1|G,
+             weights=W,
+             data=data)
+  
+return(fit)
+}
+
+
+
+# Calculate Sx, Px, given log-linear fit of sigmoidal model
+sigfit_coefs <- function(c1,c2,x){
+  a <- c2
+  b <- c1 / c2
+  Px <- ab_to_px(a, b, x)
+  
+  # Derivative of sigmoid
+  sig2d <- function(Px, a,b)-(exp(a * (Px - b)) * a/(1 + exp(a * (Px - b)))^2)
+  Sx <- -100 * sig2d(Px,a,b)
+  #Sx <- 100 * c2/4  # slope at P50
+  
+  list(Px=unname(Px), Sx=unname(Sx))
+}
+
+get_boot_pred_sigmoid <- function(f, data, coverage){
+  
+  preddfr <- data.frame(minP=seq(min(data$minP), max(data$minP), length=101))
+  
+  normpred <- sigmoid_untrans(predict(f$fit, preddfr, interval="none"))
+  
+  bootm <- apply(f$boot,1, function(x)x[1] + x[2]*preddfr$minP)
+  bootpred <- as.data.frame(t(apply(bootm, 1, boot_ci, coverage=coverage)))
+  names(bootpred) <- c("lwr","upr")
+  bootpred <- lapply(bootpred, sigmoid_untrans)
+  bootpred$x <- -preddfr$minP
+  bootpred$fit <- normpred
+  
+  return(bootpred)
+}
 

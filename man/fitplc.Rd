@@ -11,8 +11,9 @@ fitcond(dfr, varnames = c(K = "K", WP = "MPa"), Kmax = NULL,
   WP_Kmax = NULL, ...)
 
 fitplc(dfr, varnames = c(PLC = "PLC", WP = "MPa"), weights = NULL,
-  random = NULL, model = "Weibull", startvalues = list(Px = 3, S = 20),
-  x = 50, bootci = TRUE, nboot = 999, quiet = FALSE, ...)
+  random = NULL, model = c("Weibull", "sigmoidal"), x = 50,
+  coverage = 0.95, bootci = TRUE, nboot = 999, quiet = TRUE,
+  startvalues = NULL, ...)
 
 fitplcs(dfr, group, ...)
 
@@ -21,59 +22,74 @@ fitconds(dfr, group, ...)
 \arguments{
 \item{dfr}{A dataframe that contains water potential and plc or conductivity/conductance data.}
 
-\item{varnames}{A vector specifying the names of the PLC and water potential data (WP).}
+\item{varnames}{A vector specifying the names of the PLC and water potential data (see Examples).}
 
 \item{Kmax}{Maximum conduct(ance)(ivity), optional (and only when using \code{fitcond}). See Examples.}
 
 \item{WP_Kmax}{Water potential above which Kmax will be calculated from the data. Optional (and only when using \code{fitcond}). See Examples.}
 
-\item{weights}{A variable used as weights in weighted non-linear regression that must be present in the dataframe (unquoted, see examples).}
+\item{weights}{A variable used as weights that must be present in the dataframe (unquoted, see examples).}
 
-\item{random}{Variable that specified random effects (unquoted; must be present in dfr).}
+\item{random}{Variable that specifies random effects (unquoted; must be present in dfr).}
 
-\item{model}{At the moment, only 'Weibull' is allowed.}
-
-\item{startvalues}{A list of starting values. If set to NULL, \code{fitplc} will attempt to guess starting values.}
+\item{model}{Either 'Weibull' or 'sigmoidal'. See Details.}
 
 \item{x}{If the P50 is to be returned, x = 50. Set this value if other points of the PLC curve should be estimated (although probably more robustly done via \code{\link{getPx}}).}
 
+\item{coverage}{The coverage of the confidence interval for the parameters (0.95 is the default).}
+
 \item{bootci}{If TRUE, also computes the bootstrap confidence interval.}
 
-\item{nboot}{The number of bootstrap replicates (only relevant when \code{bootci=TRUE}).}
+\item{nboot}{The number of bootstrap replicates used for calculating confidence intervals.}
 
 \item{quiet}{Logical (default FALSE), if TRUE, don't print any messages.}
+
+\item{startvalues}{Obsolete - starting values for Weibull now estimated from sigmoidal model fit.}
 
 \item{group}{Character; variable in the dataframe that specifies groups. The curve will be fit for every group level.}
 
 \item{\dots}{Further parameters passed to \code{fitplc}.}
 }
 \description{
-This function fits the Weibull curve to measurements of stem or leaf conductivity 
-measurements at various water potentials. If measurements are organized as 'percent loss conductivity' (PLC), use the \code{fitplc} function. If they are organized as the actual conductance or conductivity (as is common for leaf hydraulic  conductance data, for example), use the \code{fitcond} function. See Details and Examples for more information on how to use these functions. 
+Fit a curve to measurements of stem or leaf conductivity at various water potentials. If measurements are organized as 'percent loss conductivity' (PLC), use the \code{fitplc} function. If they are organized as the actual conductance or conductivity (as is common for leaf hydraulic  conductance data, for example), use the \code{fitcond} function. You can choose to either fit the Weibull function (the default), or the sigmoidal-exponential model. See Details and Examples for more information on how to use these functions. 
 
-It is also possible to fit multiple curves at once, for example one for each species or site, 
-with the \code{fitplcs} and \code{fitconds} functions.
+It is also possible to fit multiple curves at once, for example one for each species or site, with the \code{fitplcs} and \code{fitconds} functions. This is useful when you have data for multiple curves organized in one file.
+
+Random effects may be incorporated via the \code{random} argument (see Examples), in which case \code{nlme} will be used (in case of the Weibull), or \code{lme} (in case of the sigmoidal model).
 
 See \code{\link{plot.plcfit}} for documentation on plotting methods for the fitted objects, and the examples below.
 }
 \details{
-If a variable with the name Weights is present in the dataframe, 
-this variable will be used as the \code{weights} argument in \code{\link{nls}} to perform 
-weighted non-linear regression. See the final example on how to use this.
+\strong{Models} - 
+The Weibull model is fit as reparameterized by Ogle et al. (2009), using non-linear regression (\code{\link{nls}}) or a non-linear mixed-effects model if a random effect is present (\code{\link{nlme}}). The sigmoidal-exponential model follows the 
+specification by Pammenter and van Willigen (1998) : PLC is log-transformed so a linear fit can be obtained with \code{\link{lm}} or \code{\link{lme}} in the presence of a random effect. 
+Parameters estimated are PX (water potential at which X% conductivity is lost) and SX 
+(slope of PLC vs. water potential at P50, MPa per percent). For the sigmoidal model, SX is a parameter combination (and so is PX when x is not 50), so only bootstrap estimates of the confidence intervals are given. 
 
-If the \code{random} argument specifies a factor variable present in the dataframe, random effects will 
-be estimated both for SX and PX. This affects \code{coef} as well as the confidence intervals for the fixed effects.
+\strong{Bootstrap} - 
+We recommend, where possible, to use the bootstrapped confidence intervals for inference (use at least ca 1000 resamples). For the Weibull model, this is only possible when a sufficiently large sample size is available for a single curve (otherwise too many nls fits will fail). For the sigmoidal model, however, bootstrap is always possible and will always be employed (it cannot be turned off).
 
-A plot method is available for the fitted object, see examples on how to use it.
+\strong{Confidence intervals} - 
+Calculation of confidence intervals (CI) depends on the method chosen. For the Weibull model, the CI based on profiling ('Normal approximation') is always performed, and a non-parametric bootstrap when \code{bootci=TRUE}. Both are output in \code{coef}, and the bootstrap CI is used in plotting unless otherwise specified (see \code{\link{plot.plcfit}}). When a random effect is specified (for the Weibull model), the CI is calculated with \code{\link{intervals.lme}}. For the sigmoidal model, PX and SX are functions of parameters of a linearized fit, and we thus always use the bootstrap when no random effect is present (it cannot be switched off). When a random effect is included in the sigmoidal model, we use \code{\link{deltaMethod}} from the \code{car} package.
+
+\strong{Weights} - 
+If a variable with the name Weights is present in the dataframe, this variable will be used as the \code{weights} argument to perform weighted (non-linear) regression. See Examples on how to use this.
+
+\strong{Random effects} - 
+If the \code{random} argument specifies a factor variable present in the dataframe, random effects will be estimated both for SX and PX. This affects \code{coef} as well as the confidence intervals for the fixed effects. For both the Weibull model and the sigmoidal model, only the random intercept terms are estimated (i.e. \code{random=~1|group}).
+
+A plot method is available for the fitted object, see Examples below.
 }
 \examples{
 
 # We use the built-in example dataset 'stemvul' in the examples below. See ?stemvul.
+# Most examples will fit the Weibull model (the default); try running some of the examples
+# with 'model="sigmoidal"' and compare the results.
   
 # 1. Fit one species (or fit all, see next example)
 dfr1 <- subset(stemvul, Species =="dpap")
 
-# Make fit. Store results in object 'pfit'
+# Fit Weibull model. Store results in object 'pfit'
 # 'varnames' specifies the names of the 'PLC' variable in the dataframe,
 # and water potential (WP). 
 # In this example, we use only 50 bootstrap replicates but recommend you set this
@@ -93,6 +109,13 @@ plot(pfit, what="embol")
 # Get the coefficients of the fit.
 coef(pfit)
 
+# Repeat for the sigmoidal model
+# Note that varnames specification above is the same as the default, so it 
+# can be omitted.
+pfit2 <- fitplc(dfr1, model="sigmoid")
+plot(pfit2)
+coef(pfit2)
+
 # 2. Fit all species in the dataset.
 # Here we also set the starting values (which is sometimes needed).
 # In this example, we use only 50 bootstrap replicates but recommend you set this
@@ -100,7 +123,7 @@ coef(pfit)
 allfit <- fitplcs(stemvul, "Species", varnames=c(PLC="PLC", WP="MPa"), nboot=50)
 
 # 3. Plot the fits.
-plot(allfit, onepanel=TRUE, plotci=FALSE, selines="none", pxlinecol="dimgrey")
+plot(allfit, onepanel=TRUE, plotci=FALSE, px_ci="none", pxlinecol="dimgrey")
 
 # Coefficients show the estimates and 95\% CI (given by 'lower' and 'upper')
 # Based on the CI's, species differences can be decided.
@@ -131,7 +154,7 @@ kfit2 <- fitcond(dfr1, varnames=c(K="Cond", WP="MPa"), WP_Kmax = -0.3, nboot=50)
 
 # Fit multiple conductivity curves at once (bootstrap omitted for speed).
 kfits3 <- fitconds(stemvul, "Species", varnames=list(K="Cond", WP="MPa"), WP_Kmax=-0.3, boot=FALSE)
-plot(kfits3, onepanel=TRUE, ylim=c(0,12), selines="none")
+plot(kfits3, onepanel=TRUE, ylim=c(0,12), px_ci="none")
 
 # 5. Random effects.
 # This example takes into account the fact that the individual data points for a species are not 
