@@ -9,10 +9,11 @@
   pch = 19, plotPx = TRUE, plotci = TRUE, plotdata = TRUE,
   plotfit = TRUE, add = FALSE, multiplier = NULL, px_ci = c("bootstrap",
   "parametric", "none"), px_ci_type = c("vertical", "horizontal"),
-  px_ci_label = TRUE, plotrandom = FALSE, linecol = "black",
-  linetype = 1, linecol2 = "blue", pxlinecol = "red", pxcex = 0.7,
-  citype = c("polygon", "lines"), what = c("relk", "PLC", "embol"),
-  selines = NULL, ...)
+  px_ci_label = TRUE, plotrandom = FALSE, pointcol = "black",
+  linecol = "black", linetype = 1, linecol2 = "blue", pxlinecol = "red",
+  pxcex = 0.7, citype = c("polygon", "lines"), cicol = alpha("lightgrey",
+  0.8), what = c("relk", "PLC", "embol"), selines = NULL,
+  xaxis = c("positive", "negative"), ...)
 
 \method{plot}{manyplcfit}(x, what = c("relk", "embol", "PLC"),
   onepanel = FALSE, linecol = NULL, pointcol = NULL, pch = 19,
@@ -47,6 +48,8 @@
 
 \item{plotrandom}{Logical. If TRUE (default is FALSE), plots the predictions for the random effects (only if random effects were included in the model fit).}
 
+\item{pointcol}{The color(s) of the data points.}
+
 \item{linecol}{The color(s) of the fitted curve (or color of the random effects curves if plotrandom=TRUE).}
 
 \item{linetype}{Line type for fitted curve (see options for \code{lty} in \code{\link{par}}).}
@@ -59,17 +62,19 @@
 
 \item{citype}{Either 'polygon' (default), or 'lines', specifying formatting of the confidence interval in the plot.}
 
+\item{cicol}{The color of the confidence interval band (if plotted).}
+
 \item{what}{Either 'relk' or 'PLC' (or synonym 'embol'); it will plot either relative conductivity or percent loss conductivity (percent embolism).}
 
 \item{selines}{Obsolete; use \code{px_ci}}
 
+\item{xaxis}{Either 'positive' (default), so that water potential is plotted as positive values, or 'negative', plotting negative-valued water potentials.}
+
 \item{onepanel}{For plotting of many curve fits, plot all curves in one panel (TRUE) or in separate panels (FALSE)}
 
-\item{pointcol}{The color(s) of the data points.}
+\item{legend}{(for fitconds and fitplcs only) Logical (default TRUE), whether to include a simple legend when plotting multiple fits}
 
-\item{legend}{Logical (default TRUE), whether to include a simple legend when plotting multiple fits}
-
-\item{legendwhere}{As in \code{\link{legend}}, specification of where to place legend (e.g. 'bottomleft'; coordinates not accepted)}
+\item{legendwhere}{(for fitconds and fitplcs only) As in \code{\link{legend}}, specification of where to place legend (e.g. 'bottomleft'; coordinates not accepted)}
 
 \item{\dots}{Further parameters passed to \code{plot}, or \code{points} (when \code{add=TRUE})}
 }

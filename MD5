@@ -1,14 +1,14 @@
-e15986db7ffaf20d6a0377685412a72b *DESCRIPTION
+70da7f74ea0265474048b97428aad806 *DESCRIPTION
 659cce239c21cae9a58fe28a224f6480 *NAMESPACE
 39793984d1a7e49a855adc5221ce0084 *R/bootfit.R
 d48adcc67eaf88ac484e27e7ebcec63b *R/coef.manyplcfit.R
 95b126f5e4edd34f9b64baa7645097b8 *R/coef.plcfit.R
 1526fa8230230df104f79c1f22453b52 *R/fitcond.R
 718a30b07e41c44d15b1275eeb8f7a24 *R/fitplc-package.R
-1a0dfa612e567d1970b7414d44b7d45a *R/fitplc.R
+c6b8df53f97a180b8ad7ee18ec511c4a *R/fitplc.R
 cebec2313d37a8c373a1022b0644a755 *R/fitplcs.R
 3b5c33ec3298d2466825508820b7b4a8 *R/getPx.R
-ef1ad49e4dcccdb1667b4dc2ce3bfce8 *R/plot.plcfit.R
+e810fbd628fc050cc9ae73a98fd7cb46 *R/plot.plcfit.R
 5d35a1b5d0c5c2c646389223790fe57a *R/plotutils.R
 6fb2254eceb962c50b4d3189fd9ac225 *R/predict_nls.R
 c6e9cefa9097aa680a2812cf03a193f8 *R/print.manyplcfit.R
@@ -21,5 +21,7 @@ dc166c2ef2c9cc12f86ccd919766da4d *man/fitplc.Rd
 4bdec85e2ee01aa0abf0f2470a17abd6 *man/fsigmoidal.Rd
 2bd32395f6a66c965a6d263de1abf7c0 *man/fweibull.Rd
 45cd6b9884c56e20f1d6c18b3b68ad01 *man/getPx.Rd
-ea8916d90a0360978a5a913b4c0c3a6b *man/plot.plcfit.Rd
+7db48122981845effc83f2596cd9ea87 *man/plot.plcfit.Rd
 93d6398bf29d859541539a6b34bb56b7 *man/stemvul.Rd
+3d10e9343a64de0ba7d2fc82711d2392 *tests/testthat.R
+7bd44ab12dd452869fb8b01650fbb4f6 *tests/testthat/test_fitplc.R
