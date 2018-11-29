@@ -6,7 +6,7 @@
 #' @param px_ci Option for the confidence interval around Px, either 'parametric' (confidence interval computed with \code{\link{confint}}), 'bootstrap' (computed with non-parametric bootstrap) or 'none' (no plotting of the confidence interval) (formerly argument was called \code{selines})
 #' @param px_ci_type Either 'vertical' (default), or 'horizontal', to plot confidence limits for Px.
 #' @param px_ci_label Logical (default TRUE), whether to write a label next to the CI for Px.
-#' @param plotrandom Logical. If TRUE (default is FALSE), plots the predictions for the random effects (only if random effects were included in the model fit).
+#' @param plotrandom Logical. If TRUE (the default is FALSE), plots the predictions for the random effects (only if random effects were included in the model fit).
 #' @param multiplier Multiply the scaled data (for plotting).
 #' @param x A fitted curve returned by \code{fitplc}
 #' @param plotPx Logical (default TRUE), whether to plot a vertical line for the P50.
@@ -17,6 +17,7 @@
 #' @param citype Either 'polygon' (default), or 'lines', specifying formatting of the confidence interval in the plot.
 #' @param linecol The color(s) of the fitted curve (or color of the random effects curves if plotrandom=TRUE).
 #' @param linetype Line type for fitted curve (see options for \code{lty} in \code{\link{par}}).
+#' @param linelwd Width of the line (see options for \code{lwd} in \code{\link{par}}).
 #' @param pointcol The color(s) of the data points.
 #' @param linecol2 The color of the fixed effects curve (if plotrandom=TRUE; otherwise ignored).
 #' @param cicol The color of the confidence interval band (if plotted).
@@ -28,7 +29,7 @@
 #' @param \dots Further parameters passed to \code{plot}, or \code{points} (when \code{add=TRUE})
 #' @export
 #' @rdname plot.plcfit
-#' @importFrom graphics abline mtext plot
+#' @importFrom graphics abline mtext plot box
 #' @importFrom stats approx coef confint
 plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19, 
                         plotPx=TRUE, plotci=TRUE, plotdata=TRUE, plotfit=TRUE, add=FALSE,
@@ -40,6 +41,7 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
                         pointcol="black",
                         linecol="black",
                         linetype=1,
+                        linelwd=1,
                         linecol2="blue",
                         pxlinecol="red",
                         pxcex=0.7,
@@ -78,8 +80,9 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
     what <- "relk"
   }
   
-  if(plotrandom && !x$fitran)
+  if(plotrandom && !x$fitran){
     stop("To plot random effects predictions, refit with 'random' argument.")
+  }
   
   # Set x-axis label
   if(missing(xlab)){
@@ -120,14 +123,19 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
   # Set y-axis limit
   if(is.null(ylim))ylim <- c(0,multiplier*max(x$data$Y))
 
-  #if(is.null(ylim))ylim <- c(0,100)
-  
   if(x$fitran && plotrandom){
     
     ng <- length(x$pred$ran)
     if(what=="PLC"){
-      x$pred$ran <- lapply(x$pred$ran, function(f)relk_to_plc(f$fit))
-      x$pred$fit <- relk_to_plc(x$pred$fit)
+      
+      x$pred$ran <- lapply(x$pred$ran, 
+                           function(f){
+                             f$fit <- relk_to_plc(f$fit)
+                             return(f)
+                           })
+      
+      if(!x$fitran)x$pred$fit <- relk_to_plc(x$pred$fit)
+      
     }
   }
 
@@ -156,27 +164,36 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
       }
       if(citype == "polygon"){
         with(x$pred, addpoly(xsign * x, multiplier * lwr, multiplier * upr, col=cicol))
+        
         # replot points
         if(plotdata){
           with(x, {
             points(xsign * data$P, multiplier * data$Y, pch=pch, type=type, col=pointcol, ...)
           })
         }
+        
+        # replot box
+        box()
       }
       
     }
     if(plotfit){
       with(x$pred,{
-        lines(xsign * x, multiplier * fit, type='l', lty=linetype, col=linecol)
+        lines(xsign * x, multiplier * fit, type='l', lty=linetype, col=linecol, lwd=linelwd)
       })
     }
   }
   
   if(plotrandom){
-    for(i in 1:length(x$pred$ran)){
-      with(x$pred$ran[[i]], lines(xsign * x, multiplier * fit, type='l', col=linecol))
-    }  
-    with(x$pred, lines(xsign * x, multiplier * fit, type='l', lwd=2, col=linecol2))
+    
+    for(i in seq_along(x$pred$ran)){
+      with(x$pred$ran[[i]], 
+           lines(xsign * x, multiplier * fit, 
+                 type='l', col=linecol)
+           )
+    } 
+    with(x$pred, lines(xsign * x, multiplier * fit, type='l', 
+                       lwd=2, col=linecol2))
   }
   
   if(plotPx){
@@ -240,10 +257,12 @@ plot.plcfit <- function(x, xlab=NULL, ylab=NULL, ylim=NULL, pch=19,
 #'@rdname plot.plcfit
 #'@importFrom grDevices rainbow
 plot.manyplcfit <- function(x, what=c("relk","embol","PLC"), 
-                            onepanel=FALSE, linecol=NULL, 
+                            onepanel=FALSE, 
+                            linecol=NULL, 
                             pointcol=NULL,
                             pch=19, 
-                            legend=TRUE, legendwhere="topright", ...){
+                            legend=TRUE, 
+                            legendwhere="topright", ...){
   
   what <- match.arg(what)
   if(what == "embol")what <- "PLC"
@@ -260,7 +279,7 @@ plot.manyplcfit <- function(x, what=c("relk","embol","PLC"),
     if(is.null(linecol))linecol <- rainbow(np)
     if(is.null(pointcol))pointcol <- rainbow(np)
     
-    plot(x[[1]], pch=pch[1], pointcol=pointcol[1], what=what,...)
+    plot(x[[1]], pch=pch[1], pointcol=pointcol[1], linecol=linecol[1], what=what,...)
     if(np > 1){
       for(i in 2:np){
         plot(x[[i]], add=TRUE, linecol=linecol[i], pointcol=pointcol[i], pch=pch[i], what=what, ...)
