@@ -70,8 +70,8 @@ See \code{\link{plot.plcfit}} for documentation on plotting methods for the fitt
 }
 \details{
 \strong{Models} - 
-The Weibull model is fit as reparameterized by Ogle et al. (2009), using non-linear regression (\code{\link{nls}}) or a non-linear mixed-effects model if a random effect is present (\code{\link{nlme}}). The sigmoidal-exponential model follows the 
-specification by Pammenter and van Willigen (1998) : PLC is log-transformed so a linear fit can be obtained with \code{\link{lm}} or \code{\link{lme}} in the presence of a random effect. 
+The Weibull model is fit as reparameterized by Ogle et al. (2009), using non-linear regression (\code{\link{nls}}) or a non-linear mixed-effects model if a random effect is present (\code{\link[nlme]{nlme}}). The sigmoidal-exponential model follows the 
+specification by Pammenter and van Willigen (1998) : PLC is log-transformed so a linear fit can be obtained with \code{\link{lm}} or \code{\link[nlme]{lme}} in the presence of a random effect. 
 Parameters estimated are PX (water potential at which X% conductivity is lost) and SX 
 (slope of PLC vs. water potential at P50, MPa per percent). For the sigmoidal model, SX is a parameter combination (and so is PX when x is not 50), so only bootstrap estimates of the confidence intervals are given. 
 
@@ -79,7 +79,7 @@ Parameters estimated are PX (water potential at which X% conductivity is lost) a
 We recommend, where possible, to use the bootstrapped confidence intervals for inference (use at least ca 1000 resamples). For the Weibull model, this is only possible when a sufficiently large sample size is available for a single curve (otherwise too many nls fits will fail). For the sigmoidal model, however, bootstrap is always possible and will always be employed (it cannot be turned off).
 
 \strong{Confidence intervals} - 
-Calculation of confidence intervals (CI) depends on the method chosen. For the Weibull model, the CI based on profiling ('Normal approximation') is always performed, and a non-parametric bootstrap when \code{bootci=TRUE}. Both are output in \code{coef}, and the bootstrap CI is used in plotting unless otherwise specified (see \code{\link{plot.plcfit}}). When a random effect is specified (for the Weibull model), the CI is calculated with \code{\link{intervals.lme}}. For the sigmoidal model, PX and SX are functions of parameters of a linearized fit, and we thus always use the bootstrap when no random effect is present (it cannot be switched off). When a random effect is included in the sigmoidal model, we use \code{\link{deltaMethod}} from the \code{car} package.
+Calculation of confidence intervals (CI) depends on the method chosen. For the Weibull model, the CI based on profiling ('Normal approximation') is always performed, and a non-parametric bootstrap when \code{bootci=TRUE}. Both are output in \code{coef}, and the bootstrap CI is used in plotting unless otherwise specified (see \code{\link{plot.plcfit}}). When a random effect is specified (for the Weibull model), the CI is calculated with \code{\link[nlme]{intervals.lme}}. For the sigmoidal model, PX and SX are functions of parameters of a linearized fit, and we thus always use the bootstrap when no random effect is present (it cannot be switched off). When a random effect is included in the sigmoidal model, we use \code{\link[car]{deltaMethod}} from the \code{car} package.
 
 \strong{Weights} - 
 If a variable with the name Weights is present in the dataframe, this variable will be used as the \code{weights} argument to perform weighted (non-linear) regression. See Examples on how to use this.

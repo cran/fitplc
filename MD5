@@ -1,4 +1,4 @@
-999226cef939f566b9b010a783fa6556 *DESCRIPTION
+735b032068a048cb9fc22c27b93755bf *DESCRIPTION
 02a1a0673033c8d288063933d9169613 *NAMESPACE
 39793984d1a7e49a855adc5221ce0084 *R/bootfit.R
 d48adcc67eaf88ac484e27e7ebcec63b *R/coef.manyplcfit.R
@@ -16,9 +16,9 @@ b9e0eb34992e8be9fca49b564cf4971c *R/print.plcfit.R
 01e408990bf00a396dfe83c27190e0c2 *R/summary.plcfit.R
 b5b35a26440d59b4d55daeeeb6db5158 *R/utils.R
 1c802b80d54026e27a9a32a768770781 *R/weibull_sigmoidal.R
-86f5dacf3fd9a8304a541615433b6e55 *data/stemvul.rda
+4ac891922b92f862c9bfe0bfe1d38267 *data/stemvul.rda
 e33a6fe7ab3fe83df769a02c4a41caf7 *inst/CITATION
-bdc5fb9f898ae68924db7bd9ff12c8b3 *man/fitplc.Rd
+f7a69f3db10bc53770ae69a03d47da2e *man/fitplc.Rd
 05ec95c02170927b330ae89bab434ebc *man/fsigmoidal.Rd
 1d0c965ae39486c4bd28a4747ff21bfe *man/fweibull.Rd
 98af7297e38819d83687b964096975a8 *man/getPx.Rd
